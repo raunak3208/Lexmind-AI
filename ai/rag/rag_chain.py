@@ -1,0 +1,147 @@
+"""
+ai/rag/rag_chain.py
+
+Builds a LangChain RAG chain wired to:
+  - Mistral LLM 
+  - Chroma retriever
+
+Exposes:
+  build_rag_chain()  →  a runnable LangChain chain
+  ask()              →  convenience wrapper: query → answer string
+"""
+
+import logging
+from typing import Optional
+
+from langchain_mistralai import ChatMistralAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
+
+from ai.config import settings
+from ai.rag.vector_store import get_retriever
+
+logger = logging.getLogger(__name__)
+
+SYSTEM_PROMPT = """You are LexMind, an expert legal document analysis assistant.
+You help lawyers, paralegals, and clients understand contracts.
+
+RULES:
+1. Answer ONLY from the provided contract context.
+2. If the answer is not in the context, say: "This information is not found in the provided contract."
+3. Quote relevant clause text when helpful — use quotation marks.
+4. Be precise and concise. Avoid legal jargon unless quoting the contract.
+5. If asked about risk or ambiguity, flag it clearly.
+
+Contract context:
+{context}
+"""
+
+HUMAN_PROMPT = "{question}"
+
+
+def _format_docs(docs) -> str:
+    """Join retrieved chunks into a single context string."""
+    return "\n\n---\n\n".join(
+        f"[Chunk {i+1} | Page {doc.metadata.get('page', '?')}]\n{doc.page_content}"
+        for i, doc in enumerate(docs)
+    )
+
+
+def get_llm() -> ChatMistralAI:
+    """
+    Singleton Mistral LLM.
+    mistral-small-latest = FREE on Mistral free tier.
+    temperature=0 → deterministic, fact-grounded answers for legal use.
+    """
+    return ChatMistralAI(
+        model=settings.mistral_llm_model,
+        mistral_api_key=settings.mistral_api_key,
+        temperature=0,
+        max_retries=3,
+    )
+
+
+def build_rag_chain(document_id: Optional[str] = None, k: int = None):
+    """
+    Build and return a LangChain RAG chain.
+
+    Args:
+        document_id: restrict retrieval to one document (per-doc chat)
+                     Pass None to search all documents (global search)
+        k:           number of context chunks to retrieve
+
+    Returns:
+        A LangChain Runnable that accepts {"question": str}
+        and returns a string answer.
+    """
+    retriever = get_retriever(document_id=document_id, k=k)
+    llm       = get_llm()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [("system", SYSTEM_PROMPT), ("human", HUMAN_PROMPT)]
+    )
+
+# Simple RAG flow
+#
+# User Question
+#       ↓
+#   Retriever
+#       ↓
+# Relevant Docs
+#       ↓
+#     Prompt
+#       ↓
+#      LLM
+#       ↓
+#    Response
+
+
+    rag_chain = (
+        RunnableParallel(
+            {
+                "context":  retriever | _format_docs,
+                "question": RunnablePassthrough(),
+            }
+        )
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    logger.info(
+        f"RAG chain built  document_id={document_id or 'ALL'}  k={k or settings.retriever_k}"
+    )
+    return rag_chain
+
+
+async def ask(
+    question: str,
+    document_id: Optional[str] = None,
+    k: int = None,
+) -> dict:
+    """
+    High-level async function: ask a question, get an answer.
+
+    Args:
+        question:    the user's question about the contract
+        document_id: optional — restrict to one document
+        k:           number of context chunks
+
+    Returns:
+        {
+          "answer": str,
+          "document_id": str | None,
+          "question": str
+        }
+    """
+    chain = build_rag_chain(document_id=document_id, k=k)
+
+    logger.info(f"RAG query: '{question[:80]}...'  doc={document_id or 'ALL'}")
+    answer = await chain.ainvoke(question)
+
+    return {
+        "answer":      answer,
+        "document_id": document_id,
+        "question":    question,
+    }
