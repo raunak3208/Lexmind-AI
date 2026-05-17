@@ -4,7 +4,7 @@ ai/agents/risk_agent.py
 AGENT 3 — Risk Scorer
 Takes classified clauses → identifies risks and produces a RiskReport.
 
-Uses Mistral 
+Uses Mistral .
 Input : ClauseExtractionResult (post-classifier)
 Output: RiskReport (Pydantic)
 """

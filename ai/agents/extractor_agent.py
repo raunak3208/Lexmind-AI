@@ -4,7 +4,7 @@ ai/agents/extractor_agent.py
 AGENT 1 — Extractor
 Reads raw contract text → returns structured list of ExtractedClause objects.
 
-Uses Mistral  with JSON-mode prompting.
+Uses Mistral with JSON-mode prompting.
 Input : full contract text (string)
 Output: ClauseExtractionResult (Pydantic)
 """
