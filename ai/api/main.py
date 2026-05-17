@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ai.api.routes import ingest, analyze, search, chat, compare
 
-# ── Logging setup ─────────────────────────────────────────────────────────────
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     logger.info("=== LexMind AI Service shutting down ===")
 
 
-# ── App ───────────────────────────────────────────────────────────────────────
+# App 
 app = FastAPI(
     title="LexMind AI Service",
     description="Multi-agent RAG pipeline for legal contract analysis.",
@@ -63,7 +63,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Register routers ──────────────────────────────────────────────────────────
+# Register routers 
 app.include_router(ingest.router,  prefix="/ingest",  tags=["Ingestion"])
 app.include_router(analyze.router, prefix="/analyze", tags=["Analysis"])
 app.include_router(search.router,  prefix="/search",  tags=["Search"])
