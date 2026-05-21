@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: lexmind_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: lexmind
+
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    container_name: lexmind_ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/uploads:/app/data/uploads
+      - ./data/vector_db:/app/data/vector_db
+    env_file:
+      - ./ai/.env
+    depends_on:
+      - mongodb
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lexmind_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data/uploads:/app/data/uploads
+    env_file:
+      - ./backend/.env
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/lexmind
+      - AI_SERVICE_URL=http://ai:8000
+    depends_on:
+      - mongodb
+      - ai
+
+volumes:
+  mongo_data:
