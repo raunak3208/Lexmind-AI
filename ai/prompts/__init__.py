@@ -1,0 +1,10 @@
+from ai.prompts.agent_prompts import (
+    EXTRACTOR_SYSTEM,
+    EXTRACTOR_HUMAN,
+    CLASSIFIER_SYSTEM,
+    CLASSIFIER_HUMAN,
+    RISK_SYSTEM,
+    RISK_HUMAN,
+    SUMMARIZER_SYSTEM,
+    SUMMARIZER_HUMAN,
+)
