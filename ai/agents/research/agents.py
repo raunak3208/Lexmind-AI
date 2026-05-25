@@ -3,7 +3,6 @@ ai/agents/research/agents.py
 
 ARIA agents — adapted from your working agents.py.
 Uses Mistral tier for all LLM calls.
-Uses langgraph create_react_agent (correct import for LangChain 0.2.x).
 """
 
 from typing import List
