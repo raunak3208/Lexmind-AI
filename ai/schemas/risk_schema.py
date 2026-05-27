@@ -37,4 +37,3 @@ class RiskReport(BaseModel):
     summary:       str       = Field(..., description="2-3 sentence executive risk summary")
 
 
-print("Hello World")
