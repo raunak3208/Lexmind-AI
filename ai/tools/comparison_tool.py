@@ -102,9 +102,9 @@ async def compare_contracts(
             note = f"⚠️ Only present in {filename_a} — missing from {filename_b}."
         elif doc_b_text and not doc_a_text:
             missing_in_a.append(clause_type.value)
-            note = f"⚠️ Only present in {filename_b} — missing from {filename_a}."
+            note = f"Only present in {filename_b} — missing from {filename_a}."
         else:
-            note = "❌ Not found in either contract."
+            note = " Not found in either contract."
 
         comparisons.append(
             ClauseComparison(
