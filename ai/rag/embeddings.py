@@ -1,18 +1,24 @@
 """
 ai/rag/embeddings.py
 
-Mistral Embeddings wrapper — FREE tier, no cost.
-Model: mistral-embed  (1024-dim, great for legal text)
+Embedding model selector.
+Supports two modes controlled by settings.use_bge_embeddings:
 
-Usage:
-    from ai.rag.embeddings import get_embeddings
-    embed = get_embeddings()
+  BGE (default, recommended):
+    Model  : BAAI/bge-small-en-v1.5  (fast) or BAAI/bge-large-en-v1.5 (best)
+    Cost   : FREE — downloads once from HuggingFace, runs on local CPU
+    Quality: significantly better than mistral-embed on legal/technical text
+    Dims   : 384 (small) / 1024 (large)
+
+  Mistral embed (fallback):
+    Model  : mistral-embed
+    Cost   : FREE tier — 500k tokens/month
+    Quality: good general purpose
+    Dims   : 1024
 """
 
 import logging
 from functools import lru_cache
-
-from langchain_mistralai import MistralAIEmbeddings
 
 from ai.config import settings
 
@@ -20,16 +26,48 @@ logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
-def get_embeddings() -> MistralAIEmbeddings:
+def get_embeddings():
     """
-    Returns a singleton MistralAIEmbeddings instance.
-    Cached so we don't create a new HTTP client on every call.
+    Return singleton embedding model.
+    BGE is used by default (better quality, free, local).
+    Falls back to Mistral embed if use_bge_embeddings=False in config.
+    """
+    if settings.use_bge_embeddings:
+        return _get_bge_embeddings()
+    return _get_mistral_embeddings()
 
-    Mistral free tier limits:
-      - 1 req/sec  (we handle this via LangChain's built-in retry)
-      - 500k tokens/month  (plenty for dev / small production)
+
+def _get_bge_embeddings():
     """
-    logger.info(f"Initialising Mistral embeddings: {settings.mistral_embed_model}")
+    BGE embeddings via HuggingFace sentence-transformers.
+    Downloads model on first run (~130MB for small, ~1.3GB for large).
+    Subsequent runs load from local cache instantly.
+
+    encode_kwargs normalize_embeddings=True is required for BGE —
+    the model card explicitly states this for correct cosine similarity.
+    """
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+
+    logger.info(f"Loading BGE embeddings: {settings.bge_model_name}")
+
+    embeddings = HuggingFaceEmbeddings(
+        model_name=settings.bge_model_name,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
+
+    logger.info(f"BGE embeddings ready: {settings.bge_model_name}")
+    return embeddings
+
+
+def _get_mistral_embeddings():
+    """
+    Mistral embed fallback — requires MISTRAL_API_KEY and internet.
+    Used when use_bge_embeddings=False.
+    """
+    from langchain_mistralai import MistralAIEmbeddings
+
+    logger.info(f"Loading Mistral embeddings: {settings.mistral_embed_model}")
 
     embeddings = MistralAIEmbeddings(
         model=settings.mistral_embed_model,
