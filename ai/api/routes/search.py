@@ -12,6 +12,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai.rag.vector_store import similarity_search
+from ai.guardrails.guardrail_service import protect_query
+from ai.cache.cache_service import cache_get, cache_set
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -33,9 +35,10 @@ class SearchHit(BaseModel):
 
 
 class SearchResponse(BaseModel):
-    query:   str
-    hits:    list[SearchHit]
-    total:   int
+    query:     str
+    hits:      list[SearchHit]
+    total:     int
+    cache_hit: bool = False
 
 
 @router.post("", response_model=SearchResponse)
@@ -58,11 +61,44 @@ async def semantic_search(req: SearchRequest):
     )
 
     try:
-        results = similarity_search(
-            query=req.query,
-            document_id=req.document_id,
-            k=req.k,
-        )
+        # Guard query input
+        guard = protect_query(req.query)
+        if not guard["allowed"]:
+            raise HTTPException(status_code=400, detail=guard["blocked_reason"])
+        search_query = guard["text"]
+
+        # Check semantic cache for search results
+        cache_key_q = f"search:{search_query}"
+        cached = cache_get(cache_key_q, document_id=req.document_id, strategy="search")
+        if cached and "hits" in cached.get("meta", {}):
+            logger.info(f"Search cache HIT: '{search_query[:50]}'")
+            return SearchResponse(
+                query=search_query,
+                hits=[SearchHit(**h) for h in cached["meta"]["hits"]],
+                total=cached["meta"]["total"],
+                cache_hit=True,
+            )
+
+        strategy = req.strategy.lower()
+
+        if strategy == "hybrid":
+            from ai.rag.hybrid_retriever import hybrid_search
+            results = hybrid_search(
+                query=search_query,
+                document_id=req.document_id,
+                k=req.k,
+            )
+        else:
+            results = similarity_search(
+                query=search_query,
+                document_id=req.document_id,
+                k=req.k * 3 if req.rerank else req.k,
+            )
+
+        if req.rerank and results and strategy != "hybrid":
+            from ai.rag.reranker import rerank
+            results = rerank(search_query, results, top_n=req.k)
+
     except Exception as e:
         logger.exception(f"Search error: {e}")
         raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
@@ -79,4 +115,13 @@ async def semantic_search(req: SearchRequest):
         for rank, doc in enumerate(results)
     ]
 
-    return SearchResponse(query=req.query, hits=hits, total=len(hits))
+    # Cache the search results
+    cache_set(
+        question=f"search:{search_query}",
+        answer="__search__",
+        document_id=req.document_id,
+        strategy="search",
+        extra_meta={"hits": [h.model_dump() for h in hits], "total": len(hits)},
+    )
+
+    return SearchResponse(query=search_query, hits=hits, total=len(hits), cache_hit=False)
