@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai.rag.rag_chain             import ask
+from ai.guardrails.guardrail_service import protect_query, protect_output
 from ai.memory.conversation_memory import add_turn, get_messages, clear_history
 
 router = APIRouter()
@@ -21,6 +22,7 @@ class ChatRequest(BaseModel):
     document_id: str
     user_id:     str = "default"
     question:    str
+    strategy:    str = "hybrid"
 
 
 class ChatResponse(BaseModel):
@@ -29,6 +31,8 @@ class ChatResponse(BaseModel):
     question:    str
     answer:      str
     turn_number: int
+    cache_hit:   bool = False
+    warnings:    list = []
 
 
 class ClearRequest(BaseModel):
@@ -51,11 +55,23 @@ async def chat_with_document(req: ChatRequest):
     )
 
     try:
+      
+        guard = protect_query(req.question)
+        if not guard["allowed"]:
+            return error(res, guard["blocked_reason"], 400)
+
+        valid = {"hybrid", "reranked", "mmr", "similarity", "multi_query"}
+        strategy = req.strategy if req.strategy in valid else "hybrid"
         result = await ask(
             question=req.question,
             document_id=req.document_id,
+            strategy=strategy,
         )
-        answer = result["answer"]
+        raw_answer = result["answer"]
+
+        # Output guard — redact PII, check for hallucination signals
+        output_guard = protect_output(raw_answer)
+        answer = output_guard["text"]
 
         # Store this turn in memory
         add_turn(
