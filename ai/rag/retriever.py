@@ -12,7 +12,7 @@ Strategies available:
   5. Contextual Retriever — for a given chunk, also fetches its neighbours (best for analysis)
 
 All retrievers respect document_id filtering — pass None to search all docs.
-All use Mistral embeddings  + local Chroma 
+All use Mistral embeddings (free) + local Chroma (free).
 """
 
 import logging
@@ -23,14 +23,16 @@ from langchain_chroma             import Chroma
 from langchain_core.documents     import Document
 from langchain_mistralai          import ChatMistralAI
 
-from ai.config       import settings
+from ai.config           import settings
 from ai.rag.embeddings   import get_embeddings
+from ai.rag.reranker       import rerank, rerank_with_threshold
+from ai.rag.hybrid_retriever import get_hybrid_retriever, hybrid_search
 
 logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "lexmind_contracts"
 
-# Internal Helper
+# ── Internal helper ───────────────────────────────────────────────────────────
 
 def _get_chroma() -> Chroma:
     """Return the persistent Chroma instance (shared across all retrievers)."""
@@ -78,7 +80,7 @@ def _build_filter(
     return {"$and": conditions}
 
 
-#  1. MMR Retriever
+# ── 1. MMR Retriever ──────────────────────────────────────────────────────────
 
 def get_mmr_retriever(
     document_id: Optional[str] = None,
@@ -126,7 +128,7 @@ def get_mmr_retriever(
     return retriever
 
 
-#  2. Similarity Retriever
+# ── 2. Similarity Retriever ───────────────────────────────────────────────────
 
 def get_similarity_retriever(
     document_id: Optional[str] = None,
@@ -170,7 +172,7 @@ def get_similarity_retriever(
     return retriever
 
 
-#  3. Clause-Type Filtered Retriever 
+# ── 3. Clause-Type Filtered Retriever ────────────────────────────────────────
 
 def get_clause_type_retriever(
     clause_type: str,
@@ -211,7 +213,7 @@ def get_clause_type_retriever(
     return retriever
 
 
-# ─ 4. Multi-Query Retriever 
+# ── 4. Multi-Query Retriever ──────────────────────────────────────────────────
 
 def get_multi_query_retriever(
     document_id: Optional[str] = None,
@@ -256,7 +258,8 @@ def get_multi_query_retriever(
     return retriever
 
 
-#  5. Contextual Retriever (window retrieval) 
+# ── 5. Contextual Retriever (window retrieval) ────────────────────────────────
+
 def get_contextual_retriever(
     document_id: Optional[str] = None,
     k: int = None,
@@ -356,7 +359,71 @@ def retrieve_with_context(
     return sorted_docs
 
 
-# Convenience factory 
+# ── 6. Reranked Retriever ─────────────────────────────────────────────────────
+
+def get_reranked_retriever(
+    document_id=None,
+    k: int = None,
+    reranker_top_n: int = None,
+    fetch_strategy: str = "similarity",
+):
+    """
+    Two-stage retrieval: fetch more candidates than needed, then rerank.
+
+    Stage 1 (fast): Chroma vector search fetches fetch_k candidates
+    Stage 2 (precise): cross-encoder reranks and returns top reranker_top_n
+
+    This is the highest quality retriever in LexMind.
+    Use for: final answer generation, high-stakes clause lookup.
+
+    Args:
+        document_id:     optional document filter
+        k:               candidates to fetch from Chroma (fetch wide)
+        reranker_top_n:  final results after reranking (keep narrow)
+        fetch_strategy:  "similarity" or "mmr" for the fetch stage
+
+    Returns:
+        LangChain BaseRetriever wrapping reranked results
+    """
+    from langchain_core.retrievers import BaseRetriever
+    from langchain_core.callbacks import CallbackManagerForRetrieverRun
+    import pydantic
+
+    k = k or (settings.retriever_k * 3)  # fetch 3x more than needed
+    top_n = reranker_top_n or settings.reranker_top_n
+
+    # Choose fetch strategy
+    if fetch_strategy == "mmr":
+        base_retriever = get_mmr_retriever(document_id=document_id, k=k)
+    else:
+        base_retriever = get_similarity_retriever(document_id=document_id, k=k)
+
+    class RerankedRetriever(BaseRetriever):
+        model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
+        _base: object = pydantic.PrivateAttr()
+        _top_n: int = pydantic.PrivateAttr()
+
+        def __init__(self, base, top_n):
+            super().__init__()
+            self._base = base
+            self._top_n = top_n
+
+        def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun):
+            candidates = self._base.invoke(query)
+            return rerank(query, candidates, top_n=self._top_n)
+
+        async def _aget_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun):
+            candidates = await self._base.ainvoke(query)
+            return rerank(query, candidates, top_n=self._top_n)
+
+    logger.info(
+        f"[Reranked Retriever]  fetch_k={k}  top_n={top_n}  "
+        f"strategy={fetch_strategy}  doc={document_id or 'ALL'}"
+    )
+    return RerankedRetriever(base=base_retriever, top_n=top_n)
+
+
+# ── Convenience factory ───────────────────────────────────────────────────────
 
 def get_retriever(
     strategy: str = "mmr",
@@ -369,7 +436,7 @@ def get_retriever(
     Used by rag_chain.py and FastAPI routes.
 
     Args:
-        strategy:     "mmr" | "similarity" | "clause_type" | "multi_query"
+        strategy:     "mmr" | "similarity" | "clause_type" | "multi_query" | "reranked" | "hybrid"
         document_id:  optional document filter
         clause_type:  required when strategy="clause_type"
         k:            number of results
@@ -396,6 +463,16 @@ def get_retriever(
 
     elif strategy == "multi_query":
         return get_multi_query_retriever(document_id=document_id, k=k)
+
+    elif strategy == "reranked":
+        return get_reranked_retriever(
+            document_id=document_id,
+            k=k,
+            reranker_top_n=settings.reranker_top_n,
+        )
+
+    elif strategy == "hybrid":
+        return get_hybrid_retriever(document_id=document_id, k=k)
 
     else:
         logger.warning(f"Unknown strategy '{strategy}' — defaulting to MMR")
