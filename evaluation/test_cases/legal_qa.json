@@ -1,0 +1,52 @@
+[
+  {
+    "question": "What are the payment terms in this contract?",
+    "ground_truth": "The Client shall pay the Consultant five thousand dollars per month within 30 days of invoice date.",
+    "category": "payment"
+  },
+  {
+    "question": "What happens if payment is late?",
+    "ground_truth": "Late payments shall incur a penalty of 2% per month.",
+    "category": "payment"
+  },
+  {
+    "question": "How can this contract be terminated?",
+    "ground_truth": "Either party may terminate this Agreement with 30 days written notice. The Client may terminate immediately for cause.",
+    "category": "termination"
+  },
+  {
+    "question": "What are the confidentiality obligations?",
+    "ground_truth": "The Consultant shall not disclose any proprietary information of the Client to any third party during or after the term of this Agreement.",
+    "category": "confidentiality"
+  },
+  {
+    "question": "What law governs this contract?",
+    "ground_truth": "This Agreement shall be governed by the laws of the State of New York.",
+    "category": "governing_law"
+  },
+  {
+    "question": "Who owns intellectual property created under this contract?",
+    "ground_truth": "All work product created by the Consultant shall be the sole property of the Client.",
+    "category": "intellectual_property"
+  },
+  {
+    "question": "What is the non-compete restriction?",
+    "ground_truth": "The Consultant agrees not to work with any competitor of the Client for 2 years after termination in any country worldwide.",
+    "category": "non_compete"
+  },
+  {
+    "question": "What is the limitation of liability?",
+    "ground_truth": "In no event shall either party be liable for indirect or consequential damages. Total liability shall not exceed the fees paid in the last 3 months.",
+    "category": "liability"
+  },
+  {
+    "question": "Does the confidentiality obligation survive termination?",
+    "ground_truth": "Yes. The confidentiality obligation survives termination of the agreement.",
+    "category": "confidentiality"
+  },
+  {
+    "question": "What are the parties to this agreement?",
+    "ground_truth": "The parties are Acme Corp as the Client and John Doe as the Consultant.",
+    "category": "parties"
+  }
+]
