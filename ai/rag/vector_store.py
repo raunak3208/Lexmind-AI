@@ -1,7 +1,7 @@
 """
 ai/rag/vector_store.py
 
-Local Chroma vector store — persists to disk.
+Local Chroma vector store — 100% free, persists to disk.
 Handles:
   - adding document chunks after ingestion
   - deleting all chunks belonging to a document
@@ -20,6 +20,7 @@ from langchain_core.documents import Document
 
 from ai.config import settings
 from ai.rag.embeddings import get_embeddings
+from ai.rag.bm25_store import get_bm25_store
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,11 @@ def add_chunks(chunks: List[Document]) -> List[str]:
 
     ids = store.add_documents(chunks)
     logger.info(f"Stored {len(ids)} vectors in Chroma")
+
+    # Mirror to BM25 sparse index
+    bm25 = get_bm25_store()
+    bm25.add_chunks(chunks)
+
     return ids
 
 
@@ -74,6 +80,24 @@ def delete_document(document_id: str) -> None:
     # Chroma supports metadata filtering on delete
     store._collection.delete(where={"document_id": document_id})
     logger.info(f"Deleted all vectors for document_id={document_id}")
+
+    # Mirror deletion to BM25 sparse index
+    bm25 = get_bm25_store()
+    bm25.delete_document(document_id)
+
+    # Invalidate all semantic cache entries for this document
+    try:
+        from ai.cache.cache_service import cache_invalidate
+        cache_invalidate(document_id)
+    except Exception as e:
+        logger.warning(f"Cache invalidation failed: {e}")
+
+    # Delete knowledge graph for this document
+    try:
+        from ai.knowledge_graph.graph_service import delete_document_graph
+        delete_document_graph(document_id)
+    except Exception as e:
+        logger.warning(f"Graph deletion failed: {e}")
 
 
 def get_retriever(
