@@ -25,7 +25,7 @@ from ai.config import settings
 logger = logging.getLogger(__name__)
 
 
-# Supported extension
+# ── Supported extensions ──────────────────────────────────────────────────────
 LOADERS = {
     ".pdf":  PyPDFLoader,
     ".docx": Docx2txtLoader,
