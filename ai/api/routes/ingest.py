@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from ai.rag.document_loader import load_and_chunk, enrich_metadata
 from ai.rag.vector_store    import add_chunks
+from ai.guardrails.guardrail_service import protect_chunks, protect_contract
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -63,6 +64,10 @@ async def ingest_document(req: IngestRequest):
             filename=req.filename,
             uploaded_by=req.uploaded_by,
         )
+
+        # 3b. Redact PII from chunks before embedding
+        # Ensures PII never enters the vector store
+        chunks = protect_chunks(chunks)
 
         # 4. Embed & store
         vector_ids = add_chunks(chunks)

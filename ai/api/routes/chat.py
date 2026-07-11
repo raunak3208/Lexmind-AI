@@ -55,7 +55,9 @@ async def chat_with_document(req: ChatRequest):
     )
 
     try:
-      
+        # Use hybrid by default for chat — best of dense + sparse
+        # Falls back to mmr if strategy unrecognised
+        # Input guard — validate and sanitise query
         guard = protect_query(req.question)
         if not guard["allowed"]:
             return error(res, guard["blocked_reason"], 400)
