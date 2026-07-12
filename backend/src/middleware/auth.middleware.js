@@ -14,7 +14,7 @@ const protect = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      decoded = jwt.verify(token, (process.env.JWT_SECRET || "").trim());
     } catch (err) {
       if (err.name === "TokenExpiredError") {
         return error(res, "Token expired", 401);

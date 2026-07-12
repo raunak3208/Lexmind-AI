@@ -23,10 +23,8 @@ router.post(
     body("password")
       .isLength({ min: 6 })
       .withMessage("Password must be at least 6 characters"),
-    body("role")
-      .optional()
-      .isIn(["lawyer", "paralegal", "client"])
-      .withMessage("Role must be lawyer, paralegal or client"),
+    // Note: `role` is intentionally NOT accepted here. Self-registered users
+    // always default to "client"; privileged roles are assigned by an admin.
   ],
   async (req, res, next) => {
     if (!handleValidation(req, res)) return;

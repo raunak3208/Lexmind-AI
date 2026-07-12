@@ -1,6 +1,6 @@
 const express = require("express");
 const { protect } = require("../middleware/auth.middleware");
-const { restrictTo, ownerOrLawyer } = require("../middleware/rbac.middleware");
+const { ownerOrLawyer, canAccessDocument } = require("../middleware/rbac.middleware");
 const { upload, getFileType } = require("../middleware/upload.middleware");
 const {
   createDocument,
@@ -58,6 +58,9 @@ router.get("/:id", async (req, res, next) => {
   try {
     const doc = await getDocumentById(req.params.id);
     if (!doc) return error(res, "Document not found", 404);
+    if (!canAccessDocument(req.user, doc)) {
+      return error(res, "Access denied. You do not own this document.", 403);
+    }
     return success(res, { document: doc });
   } catch (err) {
     next(err);
