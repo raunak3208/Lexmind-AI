@@ -1,8 +1,10 @@
 const express = require("express");
-const { body, query, validationResult } = require("express-validator");
+const { body, query } = require("express-validator");
 const { protect } = require("../middleware/auth.middleware");
 const { searchDocuments } = require("../services/ai.service");
-const { success, error } = require("../utils/apiResponse");
+const { success } = require("../utils/apiResponse");
+const asyncHandler = require("../utils/asyncHandler");
+const validate = require("../middleware/validate.middleware");
 
 const router = express.Router();
 
@@ -15,21 +17,13 @@ router.post(
     body("documentId").optional().isString(),
     body("k").optional().isInt({ min: 1, max: 20 }).withMessage("k must be between 1 and 20"),
   ],
-  async (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return error(res, errors.array()[0].msg, 422);
-    }
+  validate,
+  asyncHandler(async (req, res) => {
+    const { query: searchQuery, documentId = null, k = 5 } = req.body;
 
-    try {
-      const { query: searchQuery, documentId = null, k = 5 } = req.body;
-
-      const result = await searchDocuments({ query: searchQuery, documentId, k });
-      return success(res, result);
-    } catch (err) {
-      next(err);
-    }
-  }
+    const result = await searchDocuments({ query: searchQuery, documentId, k });
+    return success(res, result);
+  })
 );
 
 module.exports = router;

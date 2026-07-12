@@ -1,19 +1,12 @@
 const express = require("express");
-const { body, validationResult } = require("express-validator");
+const { body } = require("express-validator");
 const { register, login, getMe } = require("../services/user.service");
 const { protect } = require("../middleware/auth.middleware");
-const { success, created, error } = require("../utils/apiResponse");
+const { success, created } = require("../utils/apiResponse");
+const asyncHandler = require("../utils/asyncHandler");
+const validate = require("../middleware/validate.middleware");
 
 const router = express.Router();
-
-const handleValidation = (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    error(res, errors.array()[0].msg, 422);
-    return false;
-  }
-  return true;
-};
 
 router.post(
   "/register",
@@ -28,15 +21,11 @@ router.post(
       .isIn(["lawyer", "paralegal", "client"])
       .withMessage("Role must be lawyer, paralegal or client"),
   ],
-  async (req, res, next) => {
-    if (!handleValidation(req, res)) return;
-    try {
-      const result = await register(req.body);
-      return created(res, result, "Account created");
-    } catch (err) {
-      next(err);
-    }
-  }
+  validate,
+  asyncHandler(async (req, res) => {
+    const result = await register(req.body);
+    return created(res, result, "Account created");
+  })
 );
 
 router.post(
@@ -45,24 +34,20 @@ router.post(
     body("email").isEmail().withMessage("Valid email is required"),
     body("password").notEmpty().withMessage("Password is required"),
   ],
-  async (req, res, next) => {
-    if (!handleValidation(req, res)) return;
-    try {
-      const result = await login(req.body);
-      return success(res, result, "Login successful");
-    } catch (err) {
-      next(err);
-    }
-  }
+  validate,
+  asyncHandler(async (req, res) => {
+    const result = await login(req.body);
+    return success(res, result, "Login successful");
+  })
 );
 
-router.get("/me", protect, async (req, res, next) => {
-  try {
+router.get(
+  "/me",
+  protect,
+  asyncHandler(async (req, res) => {
     const user = await getMe(req.user._id);
     return success(res, { user });
-  } catch (err) {
-    next(err);
-  }
-});
+  })
+);
 
 module.exports = router;
