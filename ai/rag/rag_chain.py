@@ -111,7 +111,8 @@ def build_rag_chain(
             if ctx:
                 return f"Knowledge Graph Context:\n{ctx}"
             return ""
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Knowledge graph context lookup failed — continuing without it: {e}")
             return ""
 
     rag_chain = (

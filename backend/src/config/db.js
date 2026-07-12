@@ -21,7 +21,7 @@ const connectDB = async () => {
         await mongoose.connect(uri);
         console.log("MongoDB reconnected");
       } catch (e) {
-        console.error("Retry failed. Exiting.");
+        console.error(`Retry failed: ${e.message}. Exiting.`);
         process.exit(1);
       }
     }, 3000);

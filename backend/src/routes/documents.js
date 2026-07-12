@@ -10,6 +10,7 @@ const {
   ingestAndAnalyze,
 } = require("../services/document.service");
 const { success, created, error } = require("../utils/apiResponse");
+const logger = require("../utils/logger");
 const asyncHandler = require("../utils/asyncHandler");
 
 const router = express.Router();
@@ -36,7 +37,11 @@ router.post(
     });
 
     // Fire and forget — runs ingest + analysis in background
-    ingestAndAnalyze(doc, req.user._id.toString()).catch(() => {});
+    ingestAndAnalyze(doc, req.user._id.toString()).catch((err) => {
+      logger.error(
+        `Background ingest/analysis failed for documentId=${doc._id}: ${err.message}`
+      );
+    });
 
     return created(res, { document: doc }, "File uploaded and processing started");
   })

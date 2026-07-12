@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { error } = require("../utils/apiResponse");
+const logger = require("../utils/logger");
 
 const protect = async (req, res, next) => {
   try {
@@ -34,6 +35,7 @@ const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (err) {
+    logger.error(`Authentication middleware error: ${err.stack || err.message}`);
     return error(res, "Authentication failed", 500);
   }
 };

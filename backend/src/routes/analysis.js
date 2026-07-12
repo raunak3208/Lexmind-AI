@@ -7,6 +7,7 @@ const {
   ingestAndAnalyze,
 } = require("../services/document.service");
 const { success, error } = require("../utils/apiResponse");
+const logger = require("../utils/logger");
 const asyncHandler = require("../utils/asyncHandler");
 
 const router = express.Router();
@@ -52,7 +53,11 @@ router.post(
       return error(res, "Analysis already completed", 400);
     }
 
-    ingestAndAnalyze(doc, req.user._id.toString()).catch(() => {});
+    ingestAndAnalyze(doc, req.user._id.toString()).catch((err) => {
+      logger.error(
+        `Background analysis retry failed for documentId=${req.params.documentId}: ${err.message}`
+      );
+    });
 
     return success(res, { documentId: req.params.documentId }, "Analysis restarted");
   })
