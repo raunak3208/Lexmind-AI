@@ -1,6 +1,7 @@
 const express = require("express");
 const { body } = require("express-validator");
 const { protect } = require("../middleware/auth.middleware");
+const { canAccessDocument } = require("../middleware/rbac.middleware");
 const { chatWithDocument, clearChatHistory } = require("../services/ai.service");
 const { getDocumentById } = require("../services/document.service");
 const ChatSession = require("../models/ChatSession");
@@ -24,6 +25,9 @@ router.post(
 
     const doc = await getDocumentById(documentId);
     if (!doc) return error(res, "Document not found", 404);
+    if (!canAccessDocument(req.user, doc)) {
+      return error(res, "Access denied. You do not own this document.", 403);
+    }
 
     if (!doc.ingested) {
       return error(res, "Document is still being processed. Try again shortly.", 400);

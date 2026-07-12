@@ -2,12 +2,12 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const signToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+  return jwt.sign({ id: userId }, (process.env.JWT_SECRET || "").trim(), {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });
 };
 
-const register = async ({ name, email, password, role }) => {
+const register = async ({ name, email, password }) => {
   const existing = await User.findOne({ email });
   if (existing) {
     const err = new Error("Email already registered");
@@ -15,7 +15,10 @@ const register = async ({ name, email, password, role }) => {
     throw err;
   }
 
-  const user = await User.create({ name, email, password, role });
+  // Never trust a client-supplied role during self-registration — that would
+  // let anyone grant themselves "lawyer" privileges. New accounts always start
+  // as "client"; privileged roles must be assigned by an administrator.
+  const user = await User.create({ name, email, password, role: "client" });
   const token = signToken(user._id);
 
   return { user: user.toSafeObject(), token };

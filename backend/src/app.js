@@ -7,8 +7,24 @@ const logger   = require("./utils/logger");
 
 const app = express();
 
+// Restrict CORS to an explicit allowlist. In development we fall back to the
+// local dev origins; in production ALLOWED_ORIGINS must be set explicitly.
+// We never reflect "*" because requests carry an Authorization header.
+const DEV_ORIGINS = ["http://localhost:3000", "http://localhost:5173"];
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+  : process.env.NODE_ENV === "production"
+  ? []
+  : DEV_ORIGINS;
+
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
+  origin: (origin, cb) => {
+    // Allow non-browser clients (no Origin header) and allowlisted origins.
+    if (!origin || allowedOrigins.includes(origin)) {
+      return cb(null, true);
+    }
+    return cb(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));

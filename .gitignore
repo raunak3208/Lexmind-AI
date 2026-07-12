@@ -1,1 +1,34 @@
-env
+# Environment files (never commit real secrets)
+.env
+.env.*
+*/.env
+*/.env.*
+# ...but always keep the example templates
+!.env.example
+!*/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*/venv/
+ai/venv/
+
+# Node
+node_modules/
+*/node_modules/
+npm-debug.log*
+
+# Data / runtime artifacts
+data/uploads/
+data/vector_db/
+data/bm25_index/
+data/knowledge_graphs/
+
+# OS / editor
+.DS_Store
+*/.DS_Store
+.idea/
+.vscode/

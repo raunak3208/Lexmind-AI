@@ -77,4 +77,13 @@ const ownerOrLawyer = (getResourceUserId) => {
   };
 };
 
-module.exports = { restrictTo, requireLevel, ownerOrLawyer };
+// Whether a user may access a document. Lawyers can access any document;
+// everyone else may only access documents they uploaded.
+const canAccessDocument = (user, doc) => {
+  if (!user || !doc) return false;
+  if (user.role === "lawyer") return true;
+  const ownerId = doc.uploadedBy?._id || doc.uploadedBy;
+  return !!ownerId && ownerId.toString() === user._id.toString();
+};
+
+module.exports = { restrictTo, requireLevel, ownerOrLawyer, canAccessDocument };

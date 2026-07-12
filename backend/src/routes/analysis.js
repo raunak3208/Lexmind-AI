@@ -1,6 +1,6 @@
 const express = require("express");
 const { protect } = require("../middleware/auth.middleware");
-const { requireLevel } = require("../middleware/rbac.middleware");
+const { requireLevel, canAccessDocument } = require("../middleware/rbac.middleware");
 const {
   getDocumentById,
   getAnalysis,
@@ -19,6 +19,9 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await getDocumentById(req.params.documentId);
     if (!doc) return error(res, "Document not found", 404);
+    if (!canAccessDocument(req.user, doc)) {
+      return error(res, "Access denied. You do not own this document.", 403);
+    }
 
     const analysis = await getAnalysis(req.params.documentId);
     if (!analysis) {
@@ -46,6 +49,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const doc = await getDocumentById(req.params.documentId);
     if (!doc) return error(res, "Document not found", 404);
+    if (!canAccessDocument(req.user, doc)) {
+      return error(res, "Access denied. You do not own this document.", 403);
+    }
 
     const analysis = await getAnalysis(req.params.documentId);
     if (analysis?.status === "completed") {
