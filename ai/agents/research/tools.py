@@ -6,6 +6,7 @@ Uses Tavily for search
 and BeautifulSoup for scraping.
 """
 
+import logging
 import os
 import requests
 from bs4 import BeautifulSoup
@@ -13,6 +14,8 @@ from langchain.tools import tool
 from tavily import TavilyClient
 
 from ai.config import settings
+
+logger = logging.getLogger(__name__)
 
 tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
@@ -36,9 +39,11 @@ def scrape_url(url: str) -> str:
     """Scrape and return clean text content from a given URL for deeper reading."""
     try:
         resp = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+        resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         for tag in soup(["script", "style", "nav", "footer"]):
             tag.decompose()
         return soup.get_text(separator=" ", strip=True)[:3000]
     except Exception as e:
+        logger.warning(f"Failed to scrape URL {url}: {e}")
         return f"Could not scrape URL: {str(e)}"

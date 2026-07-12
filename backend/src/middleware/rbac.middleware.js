@@ -1,4 +1,5 @@
 const { error } = require("../utils/apiResponse");
+const logger = require("../utils/logger");
 
 // Role hierarchy — higher index = more permissions
 const ROLE_HIERARCHY = ["client", "paralegal", "lawyer"];
@@ -72,6 +73,7 @@ const ownerOrLawyer = (getResourceUserId) => {
 
       next();
     } catch (err) {
+      logger.error(`Authorization check failed: ${err.stack || err.message}`);
       return error(res, "Authorization check failed", 500);
     }
   };

@@ -10,6 +10,7 @@ const {
   runAndSaveReport,
 } = require("../services/research.service");
 const { success, created, error } = require("../utils/apiResponse");
+const logger = require("../utils/logger");
 
 const router = express.Router();
 
@@ -27,7 +28,11 @@ router.post(
       const report = await createReport(req.body.topic, req.user._id);
 
       // Fire and forget
-      runAndSaveReport(report._id.toString(), req.body.topic).catch(() => {});
+      runAndSaveReport(report._id.toString(), req.body.topic).catch((err) => {
+        logger.error(
+          `Background research pipeline failed for reportId=${report._id}: ${err.message}`
+        );
+      });
 
       return created(res, { report }, "Research started");
     } catch (err) {

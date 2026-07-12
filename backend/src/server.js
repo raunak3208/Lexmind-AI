@@ -24,4 +24,16 @@ const start = async () => {
   });
 };
 
-start();
+process.on("unhandledRejection", (reason) => {
+  logger.error(`Unhandled promise rejection: ${reason?.stack || reason}`);
+});
+
+process.on("uncaughtException", (err) => {
+  logger.error(`Uncaught exception: ${err.stack || err.message}`);
+  process.exit(1);
+});
+
+start().catch((err) => {
+  logger.error(`Failed to start server: ${err.stack || err.message}`);
+  process.exit(1);
+});
