@@ -8,14 +8,16 @@ const {
 } = require("../services/document.service");
 const { success, error } = require("../utils/apiResponse");
 const logger = require("../utils/logger");
+const asyncHandler = require("../utils/asyncHandler");
 
 const router = express.Router();
 
 router.use(protect);
 
 // Get analysis result for a document
-router.get("/:documentId", async (req, res, next) => {
-  try {
+router.get(
+  "/:documentId",
+  asyncHandler(async (req, res) => {
     const doc = await getDocumentById(req.params.documentId);
     if (!doc) return error(res, "Document not found", 404);
 
@@ -35,36 +37,30 @@ router.get("/:documentId", async (req, res, next) => {
     }
 
     return success(res, { analysis });
-  } catch (err) {
-    next(err);
-  }
-});
+  })
+);
 
 // Retry a failed analysis — paralegal and above only
 router.post(
   "/:documentId/retry",
   requireLevel("paralegal"),
-  async (req, res, next) => {
-    try {
-      const doc = await getDocumentById(req.params.documentId);
-      if (!doc) return error(res, "Document not found", 404);
+  asyncHandler(async (req, res) => {
+    const doc = await getDocumentById(req.params.documentId);
+    if (!doc) return error(res, "Document not found", 404);
 
-      const analysis = await getAnalysis(req.params.documentId);
-      if (analysis?.status === "completed") {
-        return error(res, "Analysis already completed", 400);
-      }
-
-      ingestAndAnalyze(doc, req.user._id.toString()).catch((err) => {
-        logger.error(
-          `Background analysis retry failed for documentId=${req.params.documentId}: ${err.message}`
-        );
-      });
-
-      return success(res, { documentId: req.params.documentId }, "Analysis restarted");
-    } catch (err) {
-      next(err);
+    const analysis = await getAnalysis(req.params.documentId);
+    if (analysis?.status === "completed") {
+      return error(res, "Analysis already completed", 400);
     }
-  }
+
+    ingestAndAnalyze(doc, req.user._id.toString()).catch((err) => {
+      logger.error(
+        `Background analysis retry failed for documentId=${req.params.documentId}: ${err.message}`
+      );
+    });
+
+    return success(res, { documentId: req.params.documentId }, "Analysis restarted");
+  })
 );
 
 module.exports = router;
