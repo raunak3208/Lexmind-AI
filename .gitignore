@@ -1,9 +1,11 @@
 # Environment files (never commit real secrets)
 .env
 .env.*
-!.env.example
 */.env
 */.env.*
+# ...but always keep the example templates
+!.env.example
+!*/.env.example
 
 # Python
 __pycache__/
