@@ -13,6 +13,7 @@ Strategies available:
 
 All retrievers respect document_id filtering — pass None to search all docs.
 All use Mistral embeddings (free) + local Chroma (free).
+
 """
 
 import logging
@@ -80,7 +81,7 @@ def _build_filter(
     return {"$and": conditions}
 
 
-# ── 1. MMR Retriever ──────────────────────────────────────────────────────────
+# 1. MMR Retriever 
 
 def get_mmr_retriever(
     document_id: Optional[str] = None,
